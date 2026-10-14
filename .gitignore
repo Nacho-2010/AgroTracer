@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+**/appsettings.Development.json
+*.user
+*.log

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/AgroTraceCR.Api/AgroTraceCR.Api.csproj" />
+    <Project Path="backend/AgroTraceCR.Application/AgroTraceCR.Application.csproj" />
+    <Project Path="backend/AgroTraceCR.Domain/AgroTraceCR.Domain.csproj" />
+    <Project Path="backend/AgroTraceCR.Infrastructure/AgroTraceCR.Infrastructure.csproj" />
+    <Project Path="backend/AgroTraceCR.Tests/AgroTraceCR.Tests.csproj" />
+  </Folder>
+</Solution>
