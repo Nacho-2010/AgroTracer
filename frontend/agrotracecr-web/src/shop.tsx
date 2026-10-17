@@ -73,7 +73,12 @@ async function api(path: string, method = 'GET', body?: unknown) {
 }
 export function Shop() {
   const embedded = useEmbeddedWallet();
-  const [provider, setProvider] = useState<'freighter' | 'cavos'>('freighter');
+  const [provider, setProvider] = useState<'freighter' | 'cavos'>(() => {
+    const saved = read<string>('agro-wallet-provider', '');
+    if (saved === 'freighter' || (saved === 'cavos' && embedded.configured))
+      return saved;
+    return embedded.configured ? 'cavos' : 'freighter';
+  });
   const location = useLocation(),
     cartPage = location.pathname === '/carrito';
   const [products, setProducts] = useState<Product[]>([]),
@@ -136,6 +141,10 @@ export function Shop() {
     ),
     count = cart.length;
   const locked = !!pending && pending.order.estado !== 'Pagado';
+  const selectedProvider = pending ? pending.provider || 'freighter' : provider;
+  useEffect(() => {
+    localStorage.setItem('agro-wallet-provider', JSON.stringify(provider));
+  }, [provider]);
   function quantity(id: number, value: number) {
     if (locked) return;
     setCart((items) =>
@@ -342,11 +351,13 @@ export function Shop() {
         <label>
           Forma de acceso
           <select
-            value={pending?.provider || provider}
-            disabled={busy || locked}
+            value={selectedProvider}
+            disabled={busy || !!pending}
             onChange={(e) => {
               setProvider(e.target.value as 'freighter' | 'cavos');
               setWallet('');
+              err('');
+              msg('');
             }}
           >
             <option value="freighter">Freighter</option>
@@ -358,7 +369,16 @@ export function Shop() {
         {!embedded.configured && (
           <p>Cavos estará disponible cuando se configure la aplicación.</p>
         )}
-        {(pending?.provider || provider) === 'cavos' && (
+        {pending &&
+          pending.order.estado !== 'Pagado' &&
+          selectedProvider === 'freighter' && (
+            <p>
+              Esta compra se preparó con Freighter. Para usar Cavos, cancela la
+              compra pendiente y prepara una nueva. Si ya enviaste el pago,
+              verifica primero su estado.
+            </p>
+          )}
+        {selectedProvider === 'cavos' && (
           <>
             <p>
               Accede con Google o correo para usar tu billetera integrada en
