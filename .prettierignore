@@ -1,0 +1,14 @@
+**/node_modules/
+**/bin/
+**/obj/
+**/dist/
+.git/
+.tools/
+*.tsbuildinfo
+.env
+.env.*
+**/appsettings.Development.json
+*.log
+**/*.csproj
+**/*.props
+**/*.slnx

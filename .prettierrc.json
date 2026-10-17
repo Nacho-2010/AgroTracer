@@ -1,0 +1,16 @@
+{
+  "plugins": ["@prettier/plugin-xml"],
+  "tabWidth": 2,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "endOfLine": "lf",
+  "xmlWhitespaceSensitivity": "ignore",
+  "overrides": [
+    {
+      "files": ["*.csproj", "*.props", "*.slnx"],
+      "options": {
+        "parser": "xml"
+      }
+    }
+  ]
+}

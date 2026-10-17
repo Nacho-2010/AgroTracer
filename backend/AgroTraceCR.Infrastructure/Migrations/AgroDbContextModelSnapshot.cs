@@ -48,6 +48,98 @@ namespace AgroTraceCR.Infrastructure.Migrations
                     b.ToTable("Certificados");
                 });
 
+            modelBuilder.Entity("AgroTraceCR.Domain.Compra", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ColonesPorXlm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Cuenta")
+                        .IsRequired()
+                        .HasMaxLength(56)
+                        .HasColumnType("nvarchar(56)");
+
+                    b.Property<string>("Destino")
+                        .IsRequired()
+                        .HasMaxLength(56)
+                        .HasColumnType("nvarchar(56)");
+
+                    b.Property<string>("DetallesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("Fecha")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Memo")
+                        .IsRequired()
+                        .HasMaxLength(28)
+                        .HasColumnType("nvarchar(28)");
+
+                    b.Property<decimal>("MontoXlm")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal>("TotalColones")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("TransactionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("Vence")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Memo")
+                        .IsUnique();
+
+                    b.HasIndex("TransactionId")
+                        .IsUnique()
+                        .HasFilter("[TransactionId] IS NOT NULL");
+
+                    b.ToTable("Compras");
+                });
+
+            modelBuilder.Entity("AgroTraceCR.Domain.ConfiguracionPago", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ColonesPorXlm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Destino")
+                        .IsRequired()
+                        .HasMaxLength(56)
+                        .HasColumnType("nvarchar(56)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ConfiguracionPagos");
+                });
+
             modelBuilder.Entity("AgroTraceCR.Domain.Lote", b =>
                 {
                     b.Property<int>("Id")

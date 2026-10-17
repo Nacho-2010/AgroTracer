@@ -1,11 +1,11 @@
-using Xunit;
 using AgroTraceCR.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using StellarDotnetSdk;
 using StellarDotnetSdk.Accounts;
-using StellarDotnetSdk.Transactions;
-using StellarDotnetSdk.Operations;
 using StellarDotnetSdk.Memos;
+using StellarDotnetSdk.Operations;
+using StellarDotnetSdk.Transactions;
+using Xunit;
 
 public class StellarTests
 {
@@ -13,7 +13,9 @@ public class StellarTests
     public async Task MissingSecretFailsBeforeNetworkSubmission()
     {
         var service = new StellarService(new ConfigurationBuilder().Build());
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RegistrarAsync(new string('a', 64)));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.RegistrarAsync(new string('a', 64))
+        );
         Assert.Contains("Stellar__SecretSeed", error.Message);
     }
 

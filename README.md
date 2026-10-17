@@ -1,6 +1,6 @@
 # AgroTraceCR
 
-Demo B2B agropecuaria de Costa Rica: catálogo, productores, lotes, pedidos de prueba, ganado y certificados de trazabilidad con SHA-256 y Stellar Testnet.
+Demo B2B agropecuaria de Costa Rica: catálogo, productores, lotes, pedidos de prueba, tienda con pagos XLM en Testnet, ganado y certificados de trazabilidad con SHA-256 y Stellar Testnet.
 
 ## Requisitos
 
@@ -80,16 +80,16 @@ Domain ← Application ← Infrastructure ← Api
 - `Api`: controladores MVC sin Razor, CORS, Swagger, errores y middleware JWT preparado.
 - `Tests`: determinismo y detección de cambios del hash, configuración ausente y construcción/firma/serialización XDR de una transacción Testnet.
 
-| Método | Ruta bajo `/api` | Uso |
-|---|---|---|
-| GET | `/productos`, `/productores`, `/lotes`, `/pedidos`, `/ganado` | Listar |
-| GET | `/productores/{id}`, `/lotes/{id}`, `/ganado/{id}` | Detalle |
-| POST | `/lotes`, `/pedidos`, `/ganado` | Crear con DTO validado |
-| POST | `/ganado/{id}/certificado` | Generar un certificado por vaca |
-| POST | `/trazabilidad/{tipo}/{id}` | Registrar lote/pedido/certificado |
-| GET | `/trazabilidad/{tipo}/{id}` | Comparar SQL y evidencia Horizon |
+| Método | Ruta bajo `/api`                                              | Uso                               |
+| ------ | ------------------------------------------------------------- | --------------------------------- |
+| GET    | `/productos`, `/productores`, `/lotes`, `/pedidos`, `/ganado` | Listar                            |
+| GET    | `/productores/{id}`, `/lotes/{id}`, `/ganado/{id}`            | Detalle                           |
+| POST   | `/lotes`, `/pedidos`, `/ganado`                               | Crear con DTO validado            |
+| POST   | `/ganado/{id}/certificado`                                    | Generar un certificado por vaca   |
+| POST   | `/trazabilidad/{tipo}/{id}`                                   | Registrar lote/pedido/certificado |
+| GET    | `/trazabilidad/{tipo}/{id}`                                   | Comparar SQL y evidencia Horizon  |
 
-Las semillas incluyen dos productores, tres productos, dos lotes, una PYME, administrador y dos vacas (`BOV-CR-0001`, `BOV-CR-0002`). Los pedidos y certificados se crean desde la interfaz. Precios son referencias informativas en colones; no hay checkout ni pagos.
+Las semillas incluyen dos productores, tres productos, dos lotes, una PYME, administrador y dos vacas (`BOV-CR-0001`, `BOV-CR-0002`). Los pedidos y certificados se crean desde la interfaz. La tienda permite seleccionar productos y pagar con XLM de Testnet mediante Freighter. Los precios están en colones y la conversión de demostración es configurable.
 
 ## Comandos de construcción utilizados
 
@@ -116,3 +116,32 @@ Los `.csproj` contienen las referencias exactas a EF Core SQL Server/Design 10.0
 - Sin reserva de inventario, auditoría de usuarios, documentos veterinarios ni firma de autoridad certificadora.
 - Los errores de infraestructura no se convierten en éxitos simulados. Una caída de Horizon puede impedir verificar.
 - Etapa futura: autorización completa, outbox y conciliación, concurrencia/sequence numbers, validación veterinaria, pruebas de integración y eventualmente Soroban, fuera del alcance actual.
+
+## Formato del proyecto
+
+Visual Studio Code tiene formato al guardar con Prettier para React, CSS, JSON y Markdown, y CSharpier para C# y los proyectos .NET.
+
+Desde la raíz del repositorio, con el SDK .NET configurado como se indica arriba:
+
+```powershell
+npm ci
+dotnet tool restore
+npm run format
+npm run format:check
+```
+
+Se excluyen dependencias, compilados y configuración privada del entorno.
+
+## Vistas y tienda Stellar Testnet
+
+El selector de la esquina superior derecha cambia entre Administrador y Usuario. El usuario ve únicamente catálogo y carrito; el administrador conserva los CRUD y la configuración de pagos. Es un selector de demostración sin login, no un control de autorización: los endpoints administrativos siguen sin autenticación. Ejecutar solo en localhost.
+
+En **Administrador / Configurar pagos**, registra una cuenta pública G… activa en Testnet y la conversión fija de colones por XLM. No es una tasa de mercado. La clave privada receptora no se necesita para recibir pagos. La configuración se guarda en SQL y las compras conservan una copia del destino y de la tasa al crearse.
+
+El usuario añade productos, conecta Freighter en Testnet, revisa el monto y aprueba en su billetera. La cotización dura 15 minutos; el servidor calcula cantidades, precios y monto definitivo. Nunca se solicita ni transmite la clave secreta del usuario. La firma se pide únicamente en Freighter.
+
+El cliente conserva el hash y el XDR firmado antes de enviar. Si la red falla, puede verificar o reenviar la misma transacción, sin construir un segundo pago. El servidor consulta Horizon Testnet y valida éxito, emisor, destinatario, XLM nativo, monto, memo y fecha antes de marcar la compra como pagada. Un hash no puede aplicarse a dos compras. La compra pendiente se conserva en el navegador; no borres sus datos antes de resolverla. Testnet puede reiniciarse.
+
+Endpoints: `GET/PUT /api/tienda/configuracion`, `POST /api/tienda/compras`, `GET /api/tienda/compras/{id}`, `POST /api/tienda/compras/{id}/confirmar`. La migración `CheckoutTestnet` agrega compras y configuración, conservando las tablas existentes.
+
+La cuenta receptora creada para esta demo local tiene su clave protegida con Windows DPAPI en `C:\Stellar Agro\.tools\payments\receiver-secret.dpapi`, fuera del repositorio. Solo recibe fondos de Testnet. El panel de compras muestra las 100 compras más recientes y el enlace a sus pagos confirmados.
