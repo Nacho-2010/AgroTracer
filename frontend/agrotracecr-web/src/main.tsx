@@ -11,6 +11,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import './style.css';
+import { AgroWalletProvider } from './cavos';
 import { Collection, Verify } from './management';
 import { Shop, PaymentSettings, Purchases } from './shop';
 type Row = Record<string, string | number>;
@@ -337,7 +338,9 @@ function App() {
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <AgroWalletProvider>
+        <App />
+      </AgroWalletProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

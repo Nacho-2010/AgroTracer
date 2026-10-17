@@ -333,6 +333,12 @@ namespace AgroTraceCR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ContractId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ContractVersion")
+                        .HasColumnType("int");
+
                     b.Property<int>("EntidadId")
                         .HasColumnType("int");
 

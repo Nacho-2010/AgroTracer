@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useEmbeddedWallet } from './cavos';
 type Product = {
   id: number;
   nombre: string;
@@ -28,7 +29,12 @@ type Order = {
     subtotal: number;
   }[];
 };
-type Pending = { order: Order; hash?: string; xdr?: string };
+type Pending = {
+  order: Order;
+  hash?: string;
+  xdr?: string;
+  provider?: 'freighter' | 'cavos';
+};
 const base =
   (import.meta as unknown as { env: Record<string, string> }).env
     .VITE_API_URL || 'http://localhost:5080/api';
@@ -66,6 +72,8 @@ async function api(path: string, method = 'GET', body?: unknown) {
   return data;
 }
 export function Shop() {
+  const embedded = useEmbeddedWallet();
+  const [provider, setProvider] = useState<'freighter' | 'cavos'>('freighter');
   const location = useLocation(),
     cartPage = location.pathname === '/carrito';
   const [products, setProducts] = useState<Product[]>([]),
@@ -149,7 +157,17 @@ export function Shop() {
     );
     msg(`${p.nombre} añadido al carrito.`);
   }
-  async function connect() {
+  async function connect(selected = provider) {
+    if (selected === 'cavos') {
+      if (!embedded.address)
+        throw new Error('Inicia sesión con Cavos antes de preparar el pago.');
+      if (embedded.needsApproval)
+        throw new Error(
+          'Vuelve a iniciar sesión con Cavos para autorizar este dispositivo.',
+        );
+      setWallet(embedded.address);
+      return embedded.address;
+    }
     const f = await import('@stellar/freighter-api');
     const connected = await f.isConnected();
     if (!connected.isConnected)
@@ -186,7 +204,7 @@ export function Shop() {
       cuenta: account,
       items: cart,
     });
-    setPending({ order });
+    setPending({ order, provider });
   }
   async function confirm(payment: Pending) {
     if (!payment.hash) return;
@@ -203,7 +221,8 @@ export function Shop() {
   }
   async function pay() {
     if (!pending || pending.hash) return;
-    const account = await connect();
+    const selected = pending.provider || 'freighter';
+    const account = await connect(selected);
     if (account !== pending.order.cuenta)
       throw new Error(
         'Conecta la misma billetera con la que preparaste la compra.',
@@ -214,7 +233,6 @@ export function Shop() {
       );
     const { Horizon, TransactionBuilder, Asset, Operation, Memo, Networks } =
       await import('@stellar/stellar-sdk');
-    const f = await import('@stellar/freighter-api');
     const server = new Horizon.Server('https://horizon-testnet.stellar.org');
     let source;
     try {
@@ -248,10 +266,18 @@ export function Shop() {
         Math.floor(new Date(pending.order.vence).getTime() / 1000),
       )
       .build();
-    const signed = await f.signTransaction(transaction.toXDR(), {
-      networkPassphrase: Networks.TESTNET,
-      address: account,
-    });
+    const signed =
+      selected === 'cavos'
+        ? {
+            signedTxXdr: await embedded.sign(transaction.toXDR()),
+            error: undefined,
+          }
+        : await (
+            await import('@stellar/freighter-api')
+          ).signTransaction(transaction.toXDR(), {
+            networkPassphrase: Networks.TESTNET,
+            address: account,
+          });
     if (signed.error || !signed.signedTxXdr)
       throw new Error(
         signed.error?.message || 'El pago fue cancelado en la billetera.',
@@ -311,6 +337,67 @@ export function Shop() {
           {cartPage ? 'Seguir comprando' : `Ver carrito (${count})`}
         </Link>
       </div>
+      <section className="wallet-panel" aria-label="Acceso y billetera">
+        <h2>Tu billetera</h2>
+        <label>
+          Forma de acceso
+          <select
+            value={pending?.provider || provider}
+            disabled={busy || locked}
+            onChange={(e) => {
+              setProvider(e.target.value as 'freighter' | 'cavos');
+              setWallet('');
+            }}
+          >
+            <option value="freighter">Freighter</option>
+            <option value="cavos" disabled={!embedded.configured}>
+              Cavos · Google o correo
+            </option>
+          </select>
+        </label>
+        {!embedded.configured && (
+          <p>Cavos estará disponible cuando se configure la aplicación.</p>
+        )}
+        {(pending?.provider || provider) === 'cavos' && (
+          <>
+            <p>
+              Accede con Google o correo para usar tu billetera integrada en
+              Stellar Testnet.
+            </p>
+            {embedded.error && (
+              <p className="error" role="alert">
+                {embedded.error}
+              </p>
+            )}
+            {embedded.address ? (
+              <>
+                <p className="account">{embedded.address}</p>
+                <div className="actions">
+                  {embedded.needsApproval && (
+                    <button disabled={busy} onClick={embedded.login}>
+                      Autorizar dispositivo
+                    </button>
+                  )}
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={embedded.logout}
+                  >
+                    Cerrar sesión de Cavos
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                disabled={embedded.loading || busy}
+                onClick={embedded.login}
+              >
+                {embedded.loading ? 'Conectando…' : 'Entrar con Cavos'}
+              </button>
+            )}
+          </>
+        )}
+      </section>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -434,20 +521,30 @@ export function Shop() {
                 </p>
               )}
               <p>
-                Necesitas{' '}
-                <a
-                  href="https://www.freighter.app/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Freighter
-                </a>{' '}
+                {provider === 'cavos' ? (
+                  'Usa tu sesión de Cavos'
+                ) : (
+                  <>
+                    Necesitas{' '}
+                    <a
+                      href="https://www.freighter.app/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Freighter
+                    </a>
+                  </>
+                )}{' '}
                 en Testnet. Revisa el total antes de aprobar en tu billetera.
               </p>
               {wallet && <p className="account">Billetera: {wallet}</p>}
               <button
                 disabled={
                   busy ||
+                  (provider === 'cavos' &&
+                    (!embedded.address ||
+                      embedded.loading ||
+                      embedded.needsApproval)) ||
                   loading ||
                   !config?.configurado ||
                   cart.some((x) => !products.some((p) => p.id === x.productoId))
@@ -549,7 +646,9 @@ export function Shop() {
                       disabled={busy || !!expired}
                       onClick={() => action(pay)}
                     >
-                      {busy ? 'Procesando…' : 'Aprobar pago en Freighter'}
+                      {busy
+                        ? 'Procesando…'
+                        : `Aprobar pago en ${pending.provider === 'cavos' ? 'Cavos' : 'Freighter'}`}
                     </button>
                     <button
                       className="secondary"

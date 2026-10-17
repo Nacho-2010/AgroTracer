@@ -16,6 +16,10 @@ builder.Services.AddDbContext<AgroDbContext>(o =>
 builder.Services.AddScoped<IHashService, HashService>();
 builder.Services.AddScoped<IStellarService, StellarService>();
 builder.Services.AddScoped<ITraceService, TraceService>();
+builder.Services.AddScoped<ISorobanService>(sp => new SorobanService(
+    sp.GetRequiredService<IConfiguration>(),
+    builder.Environment.ContentRootPath
+));
 builder.Services.AddAuthentication().AddJwtBearer();
 builder.Services.AddAuthorization();
 var frontendOrigins = builder.Configuration["Frontend:Origin"] is { Length: > 0 } configuredOrigin

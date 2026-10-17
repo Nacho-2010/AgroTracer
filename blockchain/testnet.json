@@ -1,0 +1,10 @@
+{
+  "network": "Testnet",
+  "rpc": "https://soroban-testnet.stellar.org",
+  "contractId": "CBONGQ25QQKHULFHWCB4F225PH75ORD237QUWF6D4GR2KN24XBVI2EK5",
+  "admin": "GDEC3YPLJ2LVXF6DKAH34WZ6MWDQLES6USP6Z2YJ4DQSJ46UMH56ES7U",
+  "wasmSha256": "fdb55c254aa25228fe6600bd4eb2dc0926ea0f909f7f961b62c1a3a4e390279a",
+  "uploadTransaction": "a98633bb9ff7e05da5e17b6ab485dab53a840c3d6139857147f772b26b3c65cc",
+  "deployTransaction": "37448378680bd9b2c681bb35222e1bfa5cd0c75254842f382e93dd22d623e3f0",
+  "sdkVersion": "29.0.1"
+}

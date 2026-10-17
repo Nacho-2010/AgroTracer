@@ -4,8 +4,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AgroTraceCR.Infrastructure;
 
-public class TraceService(AgroDbContext db, IHashService hashes, IStellarService stellar)
-    : ITraceService
+public class TraceService(
+    AgroDbContext db,
+    IHashService hashes,
+    IStellarService stellar,
+    ISorobanService soroban
+) : ITraceService
 {
     async Task<object> Payload(string tipo, int id)
     {
@@ -57,37 +61,102 @@ public class TraceService(AgroDbContext db, IHashService hashes, IStellarService
         }
     }
 
+    static readonly SemaphoreSlim SigningGate = new(1, 1);
+
     public async Task<object> RegistrarAsync(string tipo, int id)
     {
-        var hash = hashes.Hash(await Payload(tipo, id));
-        var existing = await db.Registros.FirstOrDefaultAsync(x =>
-            x.Tipo == tipo && x.EntidadId == id && x.Hash == hash && x.Estado == "Confirmado"
-        );
-        if (existing != null)
-            return existing;
-        var r = new RegistroBlockchain
-        {
-            Tipo = tipo,
-            EntidadId = id,
-            Hash = hash,
-            Fecha = DateTimeOffset.UtcNow,
-        };
-        db.Registros.Add(r);
-        await db.SaveChangesAsync();
+        await SigningGate.WaitAsync();
         try
         {
-            var receipt = await stellar.RegistrarAsync(hash);
-            r.TransactionId = receipt.TransactionId;
-            r.Fecha = receipt.Fecha;
-            r.Estado = "Confirmado";
+            var hash = hashes.Hash(await Payload(tipo, id));
+            var contractId = soroban.ContractId;
+            var pending = await db
+                .Registros.Where(x =>
+                    x.Tipo == tipo
+                    && x.EntidadId == id
+                    && x.ContractId == contractId
+                    && x.Estado == "Pendiente"
+                    && x.TransactionId != null
+                )
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync();
+            if (pending?.TransactionId is string pendingTx)
+            {
+                var status = await soroban.TransactionAsync(pendingTx);
+                if (status.Status == "SUCCESS" && status.Entry?.Hash == pending.Hash)
+                {
+                    pending.ContractVersion = status.Entry.Version;
+                    pending.Estado = "Confirmado";
+                    await db.SaveChangesAsync();
+                }
+                else if (
+                    status.Status == "NOT_FOUND"
+                    && pending.Fecha > DateTimeOffset.UtcNow.AddMinutes(-3)
+                )
+                    throw new InvalidOperationException(
+                        "La transaccion del contrato sigue pendiente. Espera y vuelve a registrar para reconciliar el mismo intento."
+                    );
+                else
+                {
+                    pending.Estado = "Error";
+                    await db.SaveChangesAsync();
+                }
+            }
+            var existing = await db
+                .Registros.OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync(x =>
+                    x.Tipo == tipo
+                    && x.EntidadId == id
+                    && x.ContractId == contractId
+                    && x.Estado == "Confirmado"
+                );
+            if (existing?.Hash == hash)
+            {
+                var evidence = await soroban.ReadAsync(tipo, id, contractId);
+                if (evidence?.Hash == hash && evidence.Version == existing.ContractVersion)
+                    return existing;
+            }
+            var r = new RegistroBlockchain
+            {
+                Tipo = tipo,
+                EntidadId = id,
+                Hash = hash,
+                ContractId = contractId,
+                Fecha = DateTimeOffset.UtcNow,
+            };
+            db.Registros.Add(r);
             await db.SaveChangesAsync();
-            return r;
+            try
+            {
+                var receipt = await soroban.RegisterAsync(tipo, id, hash);
+                if (receipt.ContractId != contractId || receipt.Entry.Hash != hash)
+                    throw new InvalidOperationException(
+                        "La evidencia devuelta por Soroban no coincide con el registro enviado."
+                    );
+                r.TransactionId = receipt.TransactionId;
+                r.ContractVersion = receipt.Entry.Version;
+                r.Fecha = DateTimeOffset.FromUnixTimeSeconds(receipt.Entry.Timestamp);
+                r.Estado = "Confirmado";
+                await db.SaveChangesAsync();
+                return r;
+            }
+            catch (SorobanSubmissionException e)
+            {
+                r.TransactionId = e.TransactionId;
+                r.Estado = e.Pending ? "Pendiente" : "Error";
+                await db.SaveChangesAsync();
+                throw;
+            }
+            catch
+            {
+                r.Estado = "Error";
+                await db.SaveChangesAsync();
+                throw;
+            }
         }
-        catch
+        finally
         {
-            r.Estado = "Error";
-            await db.SaveChangesAsync();
-            throw;
+            SigningGate.Release();
         }
     }
 
@@ -98,7 +167,20 @@ public class TraceService(AgroDbContext db, IHashService hashes, IStellarService
             .Registros.Where(x => x.Tipo == tipo && x.EntidadId == id && x.Estado == "Confirmado")
             .OrderByDescending(x => x.Id)
             .FirstOrDefaultAsync();
-        var onChain = r?.TransactionId is string tx && await stellar.VerificarAsync(tx, r.Hash);
+        SorobanEntry? entry = null;
+        bool onChain;
+        if (r?.ContractId is string contractId && r.ContractVersion is int version)
+        {
+            entry = await soroban.ReadAsync(tipo, id, contractId, version);
+            onChain = entry?.Hash == r.Hash && entry.Version == version;
+        }
+        else
+            onChain = r?.TransactionId is string tx && await stellar.VerificarAsync(tx, r.Hash);
+        var pending = await db
+            .Registros.Where(x => x.Tipo == tipo && x.EntidadId == id && x.Estado == "Pendiente")
+            .OrderByDescending(x => x.Id)
+            .Select(x => new { x.TransactionId, x.Fecha })
+            .FirstOrDefaultAsync();
         return new
         {
             tipo,
@@ -108,8 +190,16 @@ public class TraceService(AgroDbContext db, IHashService hashes, IStellarService
             coincide = r != null && r.Hash == actual,
             verificadoEnStellar = onChain,
             verificado = r != null && r.Hash == actual && onChain,
+            mecanismo = r?.ContractId != null ? "Soroban" : "Stellar Classic",
+            contrato = r?.ContractId,
+            versionContrato = r?.ContractVersion,
+            evidenciaContrato = entry,
+            pendiente = pending,
             explorador = r?.TransactionId is string t
                 ? $"https://stellar.expert/explorer/testnet/tx/{t}"
+                : null,
+            exploradorContrato = r?.ContractId is string c
+                ? $"https://stellar.expert/explorer/testnet/contract/{c}"
                 : null,
         };
     }

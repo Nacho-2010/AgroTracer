@@ -12,3 +12,8 @@
 **/*.csproj
 **/*.props
 **/*.slnx
+
+**/*.rs
+**/target/
+**/test_snapshots/
+.stellar/

@@ -9,3 +9,7 @@
 **/appsettings.Development.json
 *.user
 *.log
+
+**/target/
+contracts/**/test_snapshots/
+.stellar/

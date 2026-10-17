@@ -44,37 +44,28 @@ npm run dev
 
 Frontend: http://localhost:5173 · API: http://localhost:5080 · Swagger (Development): http://localhost:5080/swagger
 
-## Stellar Testnet
+## Stellar Testnet y contrato Soroban
 
-SDK comunitario verificado antes de instalar: [`stellar-dotnet-sdk` 15.1.0](https://www.nuget.org/packages/stellar-dotnet-sdk/15.1.0), mantenido en [Beans-BV/dotnet-stellar-sdk](https://github.com/Beans-BV/dotnet-stellar-sdk). Su ensamblado net8.0 es compatible con la aplicación net10.0 y se compiló en esta entrega. No es un SDK oficial de Microsoft ni de SDF.
+AgroTrace incluye un contrato inteligente Rust desplegado en Stellar Testnet. Las nuevas evidencias de lotes, pedidos y certificados se guardan como versiones de una huella SHA-256 dentro del contrato. Los registros clásicos anteriores siguen siendo verificables.
 
-1. Abre [Stellar Lab](https://lab.stellar.org), selecciona **Testnet** y genera una cuenta de prueba. Guarda su secreto privadamente; no lo pegues en este chat, React ni archivos del proyecto.
-2. Fondea la dirección pública `G…` con [Friendbot](https://friendbot.stellar.org) o la herramienta de funding de Lab. Friendbot solo necesita la dirección pública; nunca envíes el secreto. Consulta las [redes oficiales](https://developers.stellar.org/docs/networks).
-3. Configura el secreto solamente en backend mediante `Stellar__SecretSeed` o user-secrets. Ejemplo interactivo que evita escribir el secreto literal en el historial:
+- Contrato: `CBONGQ25QQKHULFHWCB4F225PH75ORD237QUWF6D4GR2KN24XBVI2EK5`.
+- Despliegue y datos públicos: `blockchain/testnet.json`.
+- La administradora firma los registros con `Soroban:SecretSeed` en user-secrets o `Soroban__SecretSeed` en el entorno del backend. La consulta es pública y no necesita ese secreto.
+- Ejecuta `npm ci` también en la raíz para instalar el SDK que usa el puente de la API.
+- En **Verificar trazabilidad**, selecciona el registro y pulsa **Registrar en contrato Soroban**. La interfaz muestra la versión, el contrato y la evidencia.
+- Los pagos del carrito conservan las operaciones XLM de Testnet. Las claves del comprador permanecen en su billetera.
 
-```powershell
-$seed = Read-Host 'Secreto de la cuenta Testnet' -MaskInput
-dotnet user-secrets set 'Stellar:SecretSeed' $seed --project backend/AgroTraceCR.Api
-Remove-Variable seed
-```
-
-`-MaskInput` requiere PowerShell 7. En Windows PowerShell 5.1 usa `Read-Host -AsSecureString` y configura el secreto con tu gestor local. User-secrets reside fuera del repositorio y no cifra su contenido: es una herramienta para desarrollo local. Reinicia la API en `Development` después de configurarlo.
-
-4. En **Verificar trazabilidad**, selecciona `lote`, ID `1` y pulsa **Registrar en Testnet**. Para ganado, primero genera el certificado desde el detalle de una vaca y usa el ID del certificado.
-5. El backend crea una transacción clásica firmada con operación `ManageData`, clave `agrotrace:v1` (última huella) y un **memo hash de 32 bytes**. La evidencia histórica está en el memo de cada transacción; no depende de que el dato mutable de la cuenta siga siendo el último. No emite un activo negociable ni usa Soroban.
-6. SQL almacena SHA-256, ID de transacción real, estado, fecha UTC y red. La verificación vuelve a calcular la huella y consulta `https://horizon-testnet.stellar.org/transactions/{id}` para comprobar éxito y memo. El enlace al explorador usa `https://stellar.expert/explorer/testnet/tx/{id}`.
-
-Horizon y la passphrase de Testnet están fijados en el servidor; no se acepta una URL de Mainnet por configuración. Sin secreto, la API responde 503 con el nombre de la variable y persiste el intento como `Error`, sin inventar transaction IDs. Testnet se reinicia periódicamente: una transacción eliminada deja de verificarse.
+Consulta [la guía de Soroban](docs/soroban.md) para compilar, desplegar otra instancia, configurar el backend, revisar pruebas y mantener el TTL. La clave administradora no está incluida en el repositorio.
 
 ## Arquitectura y API
 
 ```text
 React + TypeScript + Vite → controladores ASP.NET Core
 Domain ← Application ← Infrastructure ← Api
-                         SQL Server / Stellar Horizon Testnet
+                         SQL Server / Stellar RPC y Horizon Testnet
 ```
 
-- `Domain`: nueve entidades y roles.
+- `Domain`: entidades del negocio, compras, evidencia blockchain y roles.
 - `Application`: DTOs validados y contratos de hashing, Stellar y trazabilidad.
 - `Infrastructure`: EF Core, relaciones y migración inicial con semillas; implementaciones de hashing, casos de trazabilidad y Stellar. DbContext implementa unidad de trabajo y sus DbSets los repositorios EF; no se agrega un repositorio genérico redundante.
 - `Api`: controladores MVC sin Razor, CORS, Swagger, errores y middleware JWT preparado.
@@ -115,7 +106,7 @@ Los `.csproj` contienen las referencias exactas a EF Core SQL Server/Design 10.0
 - No hay cola durable/outbox, conciliación automática ni garantía de exactamente una vez entre SQL y Stellar. Si la respuesta de red se pierde tras enviar, consultar Horizon antes de reintentar. Evitar registros concurrentes con la misma cuenta en esta demo.
 - Sin reserva de inventario, auditoría de usuarios, documentos veterinarios ni firma de autoridad certificadora.
 - Los errores de infraestructura no se convierten en éxitos simulados. Una caída de Horizon puede impedir verificar.
-- Etapa futura: autorización completa, outbox y conciliación, concurrencia/sequence numbers, validación veterinaria, pruebas de integración y eventualmente Soroban, fuera del alcance actual.
+- Etapa futura: autorización completa, outbox y conciliación, concurrencia/sequence numbers, validación veterinaria, pruebas de integración y otros contratos, fuera del alcance actual.
 
 ## Formato del proyecto
 
@@ -138,7 +129,7 @@ El selector de la esquina superior derecha cambia entre Administrador y Usuario.
 
 En **Administrador / Configurar pagos**, registra una cuenta pública G… activa en Testnet y la conversión fija de colones por XLM. No es una tasa de mercado. La clave privada receptora no se necesita para recibir pagos. La configuración se guarda en SQL y las compras conservan una copia del destino y de la tasa al crearse.
 
-El usuario añade productos, conecta Freighter en Testnet, revisa el monto y aprueba en su billetera. La cotización dura 15 minutos; el servidor calcula cantidades, precios y monto definitivo. Nunca se solicita ni transmite la clave secreta del usuario. La firma se pide únicamente en Freighter.
+El usuario añade productos, conecta Freighter o inicia sesión con Cavos en Testnet, revisa el monto y aprueba en su billetera. La cotización dura 15 minutos; el servidor calcula cantidades, precios y monto definitivo. Nunca se solicita ni transmite la clave secreta del usuario. Cavos es opcional: configurar el identificador público de aplicación siguiendo [docs/cavos.md](docs/cavos.md). Su sesión corresponde a la billetera de la tienda y no protege los endpoints administrativos.
 
 El cliente conserva el hash y el XDR firmado antes de enviar. Si la red falla, puede verificar o reenviar la misma transacción, sin construir un segundo pago. El servidor consulta Horizon Testnet y valida éxito, emisor, destinatario, XLM nativo, monto, memo y fecha antes de marcar la compra como pagada. Un hash no puede aplicarse a dos compras. La compra pendiente se conserva en el navegador; no borres sus datos antes de resolverla. Testnet puede reiniciarse.
 

@@ -3,10 +3,16 @@
   "private": true,
   "scripts": {
     "format": "prettier --write . && dotnet csharpier format .",
-    "format:check": "prettier --check . && dotnet csharpier check ."
+    "format:check": "prettier --check . && dotnet csharpier check .",
+    "contracts:test": "cd contracts && cargo test",
+    "blockchain:test": "node --test blockchain/network.test.mjs",
+    "contracts:build": "cd contracts && stellar contract build"
   },
   "devDependencies": {
     "@prettier/plugin-xml": "3.4.2",
     "prettier": "3.9.10"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "17.2.1"
   }
 }

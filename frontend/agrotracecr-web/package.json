@@ -3,12 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "overrides": {
+    "axios": "^1.20.0"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cavos/kit": "^0.4.2",
     "@stellar/freighter-api": "6.0.1",
     "@stellar/stellar-sdk": "17.2.1",
     "react": "^19.2.0",

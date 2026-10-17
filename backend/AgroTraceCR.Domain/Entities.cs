@@ -75,6 +75,8 @@ public class RegistroBlockchain : Entidad
     public string Hash { get; set; } = "";
     public string? TransactionId { get; set; }
     public string Red { get; set; } = "Testnet";
+    public string? ContractId { get; set; }
+    public int? ContractVersion { get; set; }
     public DateTimeOffset Fecha { get; set; }
     public string Estado { get; set; } = "Pendiente";
 }

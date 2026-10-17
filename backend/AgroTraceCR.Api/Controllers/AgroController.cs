@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AgroTraceCR.Api.Controllers;
 
 [ApiController, Route("api")]
-public class AgroController(AgroDbContext db, ITraceService trace) : ControllerBase
+public class AgroController(AgroDbContext db, ITraceService trace, ISorobanService soroban)
+    : ControllerBase
 {
     [HttpGet("productos")]
     public async Task<object> Productos() => await db.Productos.AsNoTracking().ToListAsync();
@@ -131,6 +132,9 @@ public class AgroController(AgroDbContext db, ITraceService trace) : ControllerB
         await db.SaveChangesAsync();
         return c;
     }
+
+    [HttpGet("contratos/configuracion")]
+    public object Contrato() => soroban.Info();
 
     [HttpPost("trazabilidad/{tipo}/{id:int}")]
     public Task<object> Registrar(string tipo, int id) => trace.RegistrarAsync(tipo, id);

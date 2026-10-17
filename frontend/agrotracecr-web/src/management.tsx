@@ -440,6 +440,17 @@ function Editor({
   );
 }
 export function Verify() {
+  const [contractInfo, setContractInfo] = useState<{
+    contractId: string;
+    admin: string;
+    explorador: string;
+  } | null>(null);
+  const [contractError, setContractError] = useState('');
+  useEffect(() => {
+    api('contratos/configuracion')
+      .then(setContractInfo)
+      .catch((e) => setContractError(e.message));
+  }, []);
   const q = new URLSearchParams(location.search);
   const [tipo, t] = useState(q.get('tipo') || 'lote'),
     [id, i] = useState(q.get('id') || ''),
@@ -511,6 +522,24 @@ export function Verify() {
         la evidencia en Stellar.
       </p>
       <section>
+        <h2>Contrato inteligente de trazabilidad</h2>
+        {contractInfo && (
+          <>
+            <p>
+              Soroban en Stellar Testnet. El contrato conserva las versiones de
+              cada huella.
+            </p>
+            <code>{contractInfo.contractId}</code>
+            <a href={contractInfo.explorador} target="_blank" rel="noreferrer">
+              Consultar contrato en Stellar Expert
+            </a>
+          </>
+        )}
+        {contractError && (
+          <p className="error" role="alert">
+            {contractError}
+          </p>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -565,7 +594,7 @@ export function Verify() {
             disabled={busy || loading || !id}
             onClick={() => run(true)}
           >
-            Registrar en Testnet
+            Registrar en contrato Soroban
           </button>
         </form>
         {!loading && !options.length && (
@@ -595,6 +624,24 @@ export function Verify() {
             Coincidencia de datos: {result.coincide ? 'Sí' : 'No'} · Evidencia
             en Stellar: {result.verificadoEnStellar ? 'Sí' : 'No'}
           </p>
+          <p>
+            Mecanismo: {result.mecanismo}
+            {result.versionContrato
+              ? ` / Versión ${result.versionContrato}`
+              : ''}
+          </p>
+          {result.contrato && (
+            <>
+              <small>Contrato que conserva esta evidencia</small>
+              <code>{result.contrato}</code>
+            </>
+          )}
+          {result.pendiente && (
+            <p role="status">
+              Hay una transacción pendiente. Espera y pulsa Registrar en
+              contrato Soroban para reconciliar el mismo intento.
+            </p>
+          )}
           <small>SHA-256 actual</small>
           <code>{result.hashActual}</code>
           {result.registro && (
@@ -605,6 +652,23 @@ export function Verify() {
                 {result.registro.fecha} · {result.registro.red}
               </p>
             </>
+          )}
+          {result.evidenciaContrato && (
+            <p>
+              Ledger: {result.evidenciaContrato.ledger} / Autor:{' '}
+              <span className="account">{result.evidenciaContrato.author}</span>
+            </p>
+          )}
+          {result.exploradorContrato && (
+            <p>
+              <a
+                href={result.exploradorContrato}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver contrato y versiones en Stellar
+              </a>
+            </p>
           )}
           {result.explorador && (
             <a href={result.explorador} target="_blank" rel="noreferrer">
